@@ -109,7 +109,7 @@ export default function LaunchPage() {
                       walletAddress={address}
                       />
 
-                      {/* <TokenPreview formData={formData} /> */}
+                      <TokenPreview formData={formData} />
                     </div>
                 </div>
             )}

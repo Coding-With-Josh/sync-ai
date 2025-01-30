@@ -9,11 +9,9 @@ interface TokenPreviewProps {
     taxFee?: string;
     liquidityFee?: string;
   };
-  mintAddress?: string;
-  isLoading?: boolean;
 }
 
-export function TokenPreview({ formData, mintAddress, isLoading }: TokenPreviewProps) {
+export function TokenPreview({ formData }: TokenPreviewProps) {
   const data = [
     { name: 'Liquidity Pool',
       //  value: parseFloat(formData.liquidityFee) || 0 
@@ -109,32 +107,6 @@ export function TokenPreview({ formData, mintAddress, isLoading }: TokenPreviewP
           <p className="font-mono text-lg">
             {formData.supply ? parseInt(formData.supply).toLocaleString() : '0'}
           </p>
-        </div>
-
-        {/* Add Token Status after Supply Information */}
-        <div className="p-4 bg-white/5 rounded-xl mt-4">
-          <h4 className="text-sm text-gray-400 mb-2">Token Status</h4>
-          {isLoading ? (
-            <div className="flex items-center space-x-2">
-              <div className="animate-spin h-4 w-4 border-2 border-blue-500 border-t-transparent rounded-full" />
-              <p className="text-sm">Creating token...</p>
-            </div>
-          ) : mintAddress ? (
-            <div className="space-y-2">
-              <p className="text-sm text-green-400">✓ Token Created</p>
-              <div className="flex items-center space-x-2">
-                <p className="text-xs font-mono text-gray-400 truncate">{mintAddress}</p>
-                <button
-                  onClick={() => navigator.clipboard.writeText(mintAddress)}
-                  className="text-xs text-blue-400 hover:text-blue-300"
-                >
-                  Copy
-                </button>
-              </div>
-            </div>
-          ) : (
-            <p className="text-sm text-gray-400">Ready to create</p>
-          )}
         </div>
       </div>
     </motion.div>
