@@ -1,0 +1,20 @@
+0000000000000000000000000000000000000000 afa565c873f8aba97d8982ca911d5bc09f716e6f Coding-With-Josh <codewithjoshh@gmail.com> 1737671596 +0100	commit (initial): first commit
+afa565c873f8aba97d8982ca911d5bc09f716e6f 0000000000000000000000000000000000000000 Coding-With-Josh <codewithjoshh@gmail.com> 1737671596 +0100	Branch: renamed refs/heads/master to refs/heads/main
+0000000000000000000000000000000000000000 afa565c873f8aba97d8982ca911d5bc09f716e6f Coding-With-Josh <codewithjoshh@gmail.com> 1737671596 +0100	Branch: renamed refs/heads/master to refs/heads/main
+afa565c873f8aba97d8982ca911d5bc09f716e6f 1a318490cfd3942be728d9a6a5871af643670df2 Coding-With-Josh <codewithjoshh@gmail.com> 1737671874 +0100	commit: good deployment
+1a318490cfd3942be728d9a6a5871af643670df2 2b83b4f8bc5cc856eb43bf7ad742f0bbb267167a Coding-With-Josh <codewithjoshh@gmail.com> 1737672045 +0100	commit: disable unused variable checks for TypeScript in ESLint configuration
+2b83b4f8bc5cc856eb43bf7ad742f0bbb267167a 8e6a8af2f1a21702a4c8e222f442b6f0585947bf Coding-With-Josh <codewithjoshh@gmail.com> 1737914538 +0100	commit: add context provider and update layout for cookie handling; configure appkit and dependencies
+8e6a8af2f1a21702a4c8e222f442b6f0585947bf 1fe472d813b36825cf375637ed8493a62e066767 Coding-With-Josh <codewithjoshh@gmail.com> 1737921385 +0100	commit: add Next.js configuration and update dependencies; include appkit button in homepage
+1fe472d813b36825cf375637ed8493a62e066767 ca0df5fecc0da07820193f53168c0ac20677f7e8 Coding-With-Josh <codewithjoshh@gmail.com> 1737921800 +0100	commit: bnojo
+ca0df5fecc0da07820193f53168c0ac20677f7e8 f963c081c36c43296b850fe02b5cfd1d542b876e Coding-With-Josh <codewithjoshh@gmail.com> 1737922057 +0100	commit: yooo wagmi
+f963c081c36c43296b850fe02b5cfd1d542b876e 8b6476b04409035596d7a34286328a1b1e70e0c5 Coding-With-Josh <codewithjoshh@gmail.com> 1737922258 +0100	commit: sdcsd
+8b6476b04409035596d7a34286328a1b1e70e0c5 a34231ba2f41d6607666ac2069c3f51e2f8f4b89 Coding-With-Josh <codewithjoshh@gmail.com> 1737922851 +0100	commit: add launch page with token creation form and network selector; enhance MagneticButton with link support
+a34231ba2f41d6607666ac2069c3f51e2f8f4b89 c6893b59362b83886f0b08d4204997882a21cdc0 Coding-With-Josh <codewithjoshh@gmail.com> 1737923091 +0100	commit: linkked
+c6893b59362b83886f0b08d4204997882a21cdc0 70cceb08aea8be9e453068d83a3968c8a997177d Coding-With-Josh <codewithjoshh@gmail.com> 1737971109 +0100	commit: enhance launch page with token form, network fees display, and token preview; improve navbar styling and add cursor styles
+70cceb08aea8be9e453068d83a3968c8a997177d fd4068d1db8c9841ce1b0c00450b7c2d794bb620 Coding-With-Josh <codewithjoshh@gmail.com> 1737980554 +0100	commit: jbhk
+fd4068d1db8c9841ce1b0c00450b7c2d794bb620 2006fa9870ed3c92cc13315d6f73f1a63261ffb4 Coding-With-Josh <codewithjoshh@gmail.com> 1737988434 +0100	commit: jheude
+0000000000000000000000000000000000000000 0000000000000000000000000000000000000000 Coding-With-Josh <codewithjoshh@gmail.com> 1738001499 +0100
+0000000000000000000000000000000000000000 d993aad208020aac6def3541850b86caad11ac82 Coding-With-Josh <codewithjoshh@gmail.com> 1738001513 +0100	commit (initial): adwds
+d993aad208020aac6def3541850b86caad11ac82 470791d6c755d8b36f6827309266aae47a4b8e40 Coding-With-Josh <codewithjoshh@gmail.com> 1738001534 +0100	commit: bbb
+0000000000000000000000000000000000000000 0000000000000000000000000000000000000000 Coding-With-Josh <codewithjoshh@gmail.com> 1738001577 +0100
+0000000000000000000000000000000000000000 377e92b0acf4afd5f084d287451cba1e20de965c Coding-With-Josh <codewithjoshh@gmail.com> 1738001601 +0100	commit (initial): hhh
