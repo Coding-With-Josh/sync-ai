@@ -96,10 +96,10 @@ export function TokenForm({ selectedChain, formData, setFormData, walletAddress 
               params: []
             }) as string;
 
-            if (chainId !== '0x5' && chainId !== '0xaa36a7') {
-              toast.error("Please connect to a testnet");
-              return;
-            }
+            // if (chainId !== '0x5' && chainId !== '0xaa36a7') {
+            //   toast.error("Please connect to a testnet");
+            //   return;
+            // }
 
             address = await createEthereumToken(
               ethereumProvider,
