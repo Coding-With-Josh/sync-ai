@@ -43,7 +43,7 @@ const networks: [AppKitNetwork, ...AppKitNetwork[]] = [
 ];
 
 // 0. Create the Ethers adapter
-export const ethersAdapter = new EthersAdapter();
+const ethersAdapter = new EthersAdapter();
 
 // 1. Create Solana adapter
 const solanaWeb3JsAdapter = new SolanaAdapter({
