@@ -38,6 +38,7 @@
     "@radix-ui/react-toggle-group": "^1.1.1",
     "@radix-ui/react-tooltip": "^1.1.6",
     "@reown/appkit": "^1.6.5",
+    "@reown/appkit-adapter-ethers": "^1.6.5",
     "@reown/appkit-adapter-solana": "^1.6.5",
     "@reown/appkit-adapter-wagmi": "^1.6.5",
     "@reown/appkit-wallet-button": "^1.6.5",

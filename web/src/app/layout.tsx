@@ -1,10 +1,13 @@
 import type { Metadata } from "next";
-import { PhantomWalletAdapter, SolflareWalletAdapter } from '@solana/wallet-adapter-wallets'
-import { SolanaAdapter } from '@reown/appkit-adapter-solana/react'
 import { Toaster } from 'sonner';
 import { Urbanist } from "next/font/google";
-import { createAppKit } from "@reown/appkit";
-import { solana, solanaTestnet, solanaDevnet } from "@reown/appkit/networks";
+import { createAppKit } from '@reown/appkit'
+import { SolanaAdapter } from '@reown/appkit-adapter-solana'
+import { EthersAdapter } from '@reown/appkit-adapter-ethers'
+import { solana, solanaTestnet, solanaDevnet, AppKitNetwork } from '@reown/appkit/networks'
+import { mainnet, arbitrum, sepolia } from '@reown/appkit/networks'
+
+import { SolflareWalletAdapter, PhantomWalletAdapter } from '@solana/wallet-adapter-wallets'
 
 import ContextProvider from "@/lib/appkit/context";
 
@@ -23,42 +26,35 @@ export const metadata: Metadata = {
   description: "Sync AI - Multichain, Multisig Launchpad for token launches",
 };
 
+const networks: [AppKitNetwork, ...AppKitNetwork[]] = [mainnet, arbitrum, sepolia, solana, solanaTestnet, solanaDevnet]
+
+// 0. Create the Ethers adapter
+export const ethersAdapter = new EthersAdapter()
+
+// 1. Create Solana adapter
+const solanaWeb3JsAdapter = new SolanaAdapter({
+  wallets: [new PhantomWalletAdapter(), new SolflareWalletAdapter()]
+})
+
+// 2. Get projectId from https://cloud.reown.com
+const projectId = '14f3352e17f7610fa94ef9c1b8206ba6'
+
+
+// 4. Create the AppKit instance
+const modal = createAppKit({
+  adapters: [ethersAdapter, solanaWeb3JsAdapter],
+  networks,
+  projectId,
+  features: {
+    analytics: true,
+  }
+})
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-
-  // 0. Set up Solana Adapter
-const solanaWeb3JsAdapter = new SolanaAdapter({
-  wallets: [new PhantomWalletAdapter(), new SolflareWalletAdapter()]
-})
-
-// 1. Get projectId from https://cloud.reown.com
-// const projectId = process.env.APPKIT_PROJECT_ID
-const projectId = "14f3352e17f7610fa94ef9c1b8206ba6"
-
-if (!projectId) {
-  throw new Error('Project ID is not defined')
-}
-
-// // 2. Create a metadata object - optional
-// const metadata = {
-//   name: 'Sync AI',
-//   description: 'AppKit Solana Example',
-//   url: 'https://example.com', // origin must match your domain & subdomain
-//   icons: ['https://avatars.githubusercontent.com/u/179229932']
-// }
-
-// 3. Create modal
-createAppKit({
-  adapters: [solanaWeb3JsAdapter],
-  networks: [solana, solanaTestnet, solanaDevnet],
-  projectId,
-  features: {
-    analytics: true // Optional - defaults to your Cloud configuration
-  }
-})
+  
 
   return (
     <html lang="en">
