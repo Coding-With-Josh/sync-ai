@@ -1,12 +1,19 @@
 import * as token from "@solana/spl-token";
 import * as web3 from "@solana/web3.js";
 import type { Provider } from '@reown/appkit-adapter-solana';
-import { ethers } from 'ethers';
+import { ethers, ContractFactory, Contract } from 'ethers';
 import { toast } from "sonner";
 import { useAppKitAccount, useAppKitProvider } from '@reown/appkit/react'
 
 import { ERC20_ABI, ERC20_BYTECODE } from '@/constants/contracts';
 
+// Add type for EIP-1193 provider
+interface EthereumProvider {
+  request: (args: { method: string; params?: any[] }) => Promise<any>;
+  isMetaMask?: boolean;
+  on?: (eventName: string, handler: (...args: any[]) => void) => void;
+  removeListener?: (eventName: string, handler: (...args: any[]) => void) => void;
+}
 
 const getLatestBlockhash = async (connection: web3.Connection) => {
     const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash('finalized');
@@ -194,7 +201,7 @@ export const createSolanaToken = async (
   };
 
   export const createEthereumToken = async (
-    provider: any,
+    provider: EthereumProvider,
     formData: { name: string; symbol: string; decimals: string; supply: string },
     setMintAddress: (address: string) => void,
     setIsLoading: (loading: boolean) => void
@@ -203,16 +210,37 @@ export const createSolanaToken = async (
     setIsLoading(true);
 
   try {
-    // Updated for ethers v6
-    const ethersProvider = new ethers.BrowserProvider(provider);
+    // First check if provider is properly connected
+    if (!provider || !provider.request) {
+      throw new Error("Provider not properly initialized");
+    }
+
+    // Request account access first
+    await provider.request({ method: 'eth_requestAccounts' });
+
+    // Check network connection
+    const chainId = await provider.request({ method: 'eth_chainId' });
+    console.log('Connected to chain:', chainId);
+
+    // Create provider and signer
+    const ethersProvider = new ethers.BrowserProvider(provider, 'any');
     const signer = await ethersProvider.getSigner();
 
-    // Check network
-    const network = await ethersProvider.getNetwork();
-    console.log('Connected to network:', network.name);
+    // Verify account
+    const address = await signer.getAddress();
+    if (!address) {
+      throw new Error("No account found");
+    }
 
-    // Check balance
-    const balance = await ethersProvider.getBalance(await signer.getAddress());
+    // Check balance with error handling
+    let balance;
+    try {
+      balance = await ethersProvider.getBalance(address);
+    } catch (error) {
+      console.error("Balance check failed:", error);
+      throw new Error("Could not verify balance. Please check your network connection.");
+    }
+
     if (balance < ethers.parseEther("0.01")) {
       toast.error("Insufficient ETH balance", {
         description: "You need at least 0.01 ETH to deploy a token"
@@ -220,35 +248,51 @@ export const createSolanaToken = async (
       return null;
     }
 
-    // Deploy contract
-    const factory = new ethers.ContractFactory(
+    // Deploy contract with proper typing
+    const factory = new ContractFactory(
       ERC20_ABI,
       ERC20_BYTECODE,
       signer
-    );
+    ) as ethers.ContractFactory;
 
-    const contract = await factory.deploy(
+    const deploymentPromise = factory.deploy(
       formData.name,
       formData.symbol,
       parseInt(formData.decimals),
       ethers.parseUnits(formData.supply, parseInt(formData.decimals))
-    );
+    ) as Promise<Contract>;
 
-    await contract.waitForDeployment();
-    const contractAddress = await contract.getAddress();
+    // Add timeout to deployment
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error("Deployment timeout")), 60000); // 1 minute timeout
+    });
+
+    const contract = await Promise.race([deploymentPromise, timeoutPromise]) as Contract;
+    const deployedContract = await contract.waitForDeployment();
+    const contractAddress = await deployedContract.getAddress();
     
     setMintAddress(contractAddress);
+    
     toast.success("Token created successfully!", {
       id: loadingToast,
       description: `Contract address: ${contractAddress}`
     });
 
     return contractAddress;
+
   } catch (error: any) {
     console.error('Error creating token:', error);
+    
+    // Handle specific error types
+    const errorMessage = error.code === 'ACTION_REJECTED' 
+      ? 'Transaction was rejected by user'
+      : error.code === 'INSUFFICIENT_FUNDS'
+      ? 'Insufficient funds for token deployment'
+      : error.message || "Failed to create token";
+
     toast.error("Failed to create token", {
       id: loadingToast,
-      description: error.message || "Transaction failed"
+      description: errorMessage
     });
     return null;
   } finally {

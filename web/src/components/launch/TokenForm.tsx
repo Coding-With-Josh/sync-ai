@@ -1,15 +1,15 @@
-"use client"
-
 import { useState } from "react";
 
 import * as token from "@solana/spl-token";
 import * as web3 from "@solana/web3.js";
-import type { Provider } from '@reown/appkit-adapter-solana'
+import type { Provider as EthereumProviderAppKit } from '@reown/appkit-adapter-ethers';
+import type { Provider as SolanaProvider } from '@reown/appkit-adapter-solana';
+import { ethers } from 'ethers';
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { useAppKitAccount, useAppKitProvider } from '@reown/appkit/react'
 import { z } from "zod";
-import { ethers } from 'ethers';
+
 import { createSolanaToken, createEthereumToken, requestSolanaAirdrop } from '@/utils/tokenCreation';
 
 const tokenSchema = z.object({
@@ -33,6 +33,28 @@ type TokenFormProps = {
   walletAddress: string;
 };
 
+// Define provider types
+interface ProviderRpcError extends Error {
+  code: number;
+  data?: unknown;
+}
+
+type ProviderMessage = { type: string; data: unknown };
+
+interface ProviderConnectInfo {
+  chainId: string;
+}
+
+// Define compatible provider interface
+interface EthereumProviderBase {
+  request(args: { method: string; params?: Array<unknown> }): Promise<unknown>;
+  on(eventName: string, handler: (param: unknown) => void): void;
+  removeListener(eventName: string, handler: (param: unknown) => void): void;
+}
+
+// Export the provider type
+export type EthereumProvider = EthereumProviderBase & EthereumProviderAppKit;
+
 export function TokenForm({ selectedChain, formData, setFormData, walletAddress }: TokenFormProps) {
   const [step, setStep] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
@@ -41,11 +63,11 @@ export function TokenForm({ selectedChain, formData, setFormData, walletAddress 
 
   
   // Get providers for both chains
-  const { walletProvider: solanaProvider } = useAppKitProvider<Provider>('solana');
-  const { walletProvider: ethereumProvider } = useAppKitProvider('eip155');
+  const { walletProvider: solanaProvider } = useAppKitProvider<SolanaProvider>('solana');
+  const { walletProvider: ethereumProvider } = useAppKitProvider<EthereumProvider>('eip155');
 
   const createToken = async () => {
-    if (!walletAddress) {
+    if (!selectedChain) {
       toast.error("Please select a blockchain network");
       return;
     }
@@ -62,13 +84,37 @@ export function TokenForm({ selectedChain, formData, setFormData, walletAddress 
           address = await createSolanaToken(walletAddress, solanaProvider, formData, setMintAddress, setIsLoading);
           break;
           
-        case 'ethereum':
-          if (!ethereumProvider) {
+        case 'ethereum': {
+          if (!ethereumProvider?.request) {
             toast.error("Please connect an Ethereum wallet");
             return;
           }
-          address = await createEthereumToken(ethereumProvider, formData, setMintAddress, setIsLoading);
+
+          try {
+            const chainId = await ethereumProvider.request({
+              method: 'eth_chainId',
+              params: []
+            }) as string;
+
+            if (chainId !== '0x5' && chainId !== '0xaa36a7') {
+              toast.error("Please connect to a testnet");
+              return;
+            }
+
+            address = await createEthereumToken(
+              ethereumProvider,
+              formData,
+              setMintAddress,
+              setIsLoading
+            );
+          } catch (error) {
+            if (error instanceof Error) {
+              toast.error(`Network error: ${error.message}`);
+            }
+            return;
+          }
           break;
+        } 
           
         default:
           toast.error("Selected chain not supported yet");
@@ -80,7 +126,7 @@ export function TokenForm({ selectedChain, formData, setFormData, walletAddress 
       }
     } catch (error) {
       console.error('Error creating token:', error);
-      toast.error("Failed to create token");
+      toast.error("Failed to create token. Please check your wallet connection.");
     }
   };
 
