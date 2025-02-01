@@ -14,7 +14,7 @@ interface EthereumProvider {
   on?: (eventName: string, handler: (...args: any[]) => void) => void;
   removeListener?: (eventName: string, handler: (...args: any[]) => void) => void;
 }
-
+ 
 const getLatestBlockhash = async (connection: web3.Connection) => {
     const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash('finalized');
     return { blockhash, lastValidBlockHeight };
@@ -44,170 +44,148 @@ export const createSolanaToken = async (
   setMintAddress,
   setIsLoading
 ) => {
-  if (!walletAddress || !walletProvider.signTransaction) {
-      toast.error("Please connect your wallet first");
-      return;
-    }
+  const loadingToast = toast.loading("Creating your token...");
+  setIsLoading(true);
+
+  try {
+    const connection = new web3.Connection(web3.clusterApiUrl('devnet'), {
+      commitment: 'processed',
+      confirmTransactionInitialTimeout: 60000,
+      wsEndpoint: 'wss://api.devnet.solana.com/'
+    });
+
+    const userPublicKey = new web3.PublicKey(walletAddress);
     
-    setIsLoading(true);
-    try {
-      const connection = new web3.Connection(web3.clusterApiUrl('devnet'), 'confirmed');
-      const userPublicKey = new web3.PublicKey(walletAddress);
-      
-      // Check balance first
-      const balance = await connection.getBalance(userPublicKey);
-      if (balance < web3.LAMPORTS_PER_SOL * 0.5) {
-        await requestSolanaAirdrop(walletAddress);
-        await new Promise(resolve => setTimeout(resolve, 2000));
-      }
+    // Check and log balance
+    const balance = await connection.getBalance(userPublicKey);
+    console.log('Current SOL balance:', balance / web3.LAMPORTS_PER_SOL);
 
-      const mintKeypair = web3.Keypair.generate();
-      const loadingToast = toast.loading("Creating your token...");
+    const mintKeypair = web3.Keypair.generate();
+    console.log('Mint keypair created:', mintKeypair.publicKey.toString());
 
-      try {
-        // Get fresh blockhash
-        const { blockhash } = await getLatestBlockhash(connection);
-        
-        // Create mint account
-        const lamports = await token.getMinimumBalanceForRentExemptMint(connection);
-        const createAcctTransaction = new web3.Transaction().add(
-          web3.SystemProgram.createAccount({
-            fromPubkey: userPublicKey,
-            newAccountPubkey: mintKeypair.publicKey,
-            space: token.MINT_SIZE,
-            lamports,
-            programId: token.TOKEN_PROGRAM_ID,
-          })
-        );
+    // Get rent exemption amount
+    const lamports = await token.getMinimumBalanceForRentExemptMint(connection);
+    console.log('Required lamports:', lamports);
 
-        // Set fresh blockhash and sign
-        createAcctTransaction.recentBlockhash = blockhash;
-        createAcctTransaction.feePayer = userPublicKey;
-        createAcctTransaction.sign(mintKeypair);
-        
-        // Get user signature with retry logic
-        let retries = 3;
-        let signedTx;
-        while (retries > 0) {
-          try {
-            signedTx = await walletProvider.signTransaction(createAcctTransaction);
-            break;
-          } catch (err) {
-            console.log(`Retry ${4 - retries} failed:`, err);
-            retries--;
-            if (retries === 0) throw err;
-            // Get fresh blockhash for retry
-            const { blockhash: newBlockhash } = await getLatestBlockhash(connection);
-            createAcctTransaction.recentBlockhash = newBlockhash;
-            await new Promise(resolve => setTimeout(resolve, 1000));
-          }
-        }
+    // Create account transaction
+    const createAcctTransaction = new web3.Transaction().add(
+      web3.SystemProgram.createAccount({
+        fromPubkey: userPublicKey,
+        newAccountPubkey: mintKeypair.publicKey,
+        space: token.MINT_SIZE,
+        lamports,
+        programId: token.TOKEN_PROGRAM_ID,
+      })
+    );
 
-        if (!signedTx) throw new Error("Failed to sign transaction");
+    // Get fresh blockhash
+    const { blockhash } = await connection.getLatestBlockhash('finalized');
+    createAcctTransaction.recentBlockhash = blockhash;
+    createAcctTransaction.feePayer = userPublicKey;
+    createAcctTransaction.sign(mintKeypair);
 
-        // Send and confirm with timeout
-        const createAcctSignature = await connection.sendRawTransaction(signedTx.serialize());
-        const confirmation = await connection.confirmTransaction({
-          signature: createAcctSignature,
-          blockhash,
-          lastValidBlockHeight: (await connection.getLatestBlockhash()).lastValidBlockHeight
-        }, 'confirmed');
+    console.log('Transaction created and signed by mint keypair');
 
-        if (confirmation.value.err) {
-          throw new Error(`Transaction failed: ${confirmation.value.err.toString()}`);
-        }
+    // Sign with wallet
+    const signedTx = await walletProvider.signTransaction(createAcctTransaction);
+    console.log('Transaction signed by wallet');
 
-        // Initialize mint
-        const initMintTransaction = new web3.Transaction().add(
-          token.createInitializeMintInstruction(
-            mintKeypair.publicKey,
-            parseInt(formData.decimals),
-            userPublicKey,
-            userPublicKey,
-            token.TOKEN_PROGRAM_ID
-          )
-        );
+    // Send and confirm
+    const signature = await connection.sendRawTransaction(signedTx.serialize());
+    console.log('Transaction sent:', signature);
 
-        initMintTransaction.recentBlockhash = (await connection.getLatestBlockhash('confirmed')).blockhash;
-        initMintTransaction.feePayer = userPublicKey;
+    const confirmation = await connection.confirmTransaction(signature, 'confirmed');
+    console.log('Transaction confirmed:', confirmation);
 
-        const initSignedTx = await walletProvider.signTransaction(initMintTransaction);
-        const initSignature = await connection.sendRawTransaction(initSignedTx.serialize());
-        await connection.confirmTransaction(initSignature, 'confirmed');
-
-        // Create Associated Token Account
-        const associatedTokenAddress = await token.getAssociatedTokenAddress(
-          mintKeypair.publicKey,
-          userPublicKey
-        );
-
-        const createAtaTransaction = new web3.Transaction().add(
-          token.createAssociatedTokenAccountInstruction(
-            userPublicKey,
-            associatedTokenAddress,
-            userPublicKey,
-            mintKeypair.publicKey
-          )
-        );
-
-        createAtaTransaction.recentBlockhash = (await connection.getLatestBlockhash('confirmed')).blockhash;
-        createAtaTransaction.feePayer = userPublicKey;
-
-        const ataSignedTx = await walletProvider.signTransaction(createAtaTransaction);
-        const ataSignature = await connection.sendRawTransaction(ataSignedTx.serialize());
-        await connection.confirmTransaction(ataSignature, 'confirmed');
-
-        // Mint initial supply
-        if (formData.supply) {
-          const mintToTransaction = new web3.Transaction().add(
-            token.createMintToInstruction(
-              mintKeypair.publicKey,
-              associatedTokenAddress,
-              userPublicKey,
-              BigInt(parseFloat(formData.supply) * Math.pow(10, parseInt(formData.decimals)))
-            )
-          );
-
-          mintToTransaction.recentBlockhash = (await connection.getLatestBlockhash('confirmed')).blockhash;
-          mintToTransaction.feePayer = userPublicKey;
-
-          const mintToSignedTx = await walletProvider.signTransaction(mintToTransaction);
-          const mintToSignature = await connection.sendRawTransaction(mintToSignedTx.serialize());
-          await connection.confirmTransaction(mintToSignature, 'confirmed');
-        }
-
-        setMintAddress(mintKeypair.publicKey.toString());
-        toast.success("Token created successfully!", {
-          id: loadingToast,
-          description: `Mint address: ${mintKeypair.publicKey.toString()}`
-        });
-
-        return mintKeypair.publicKey;
-
-      } catch (error) {
-        console.error('Transaction error:', error);
-        toast.error("Transaction failed", {
-          id: loadingToast,
-          description: "Please try again. Make sure you have enough SOL and try refreshing the page."
-        });
-      }
-
-    } catch (error) {
-      console.error('Error creating token:', error);
-      toast.error("Failed to create token");
-    } finally {
-      setIsLoading(false);
+    if (confirmation.value.err) {
+      throw new Error(`Transaction failed: ${confirmation.value.err.toString()}`);
     }
-  };
 
-  export const createEthereumToken = async (
-    provider: EthereumProvider,
-    formData: { name: string; symbol: string; decimals: string; supply: string },
-    setMintAddress: (address: string) => void,
-    setIsLoading: (loading: boolean) => void
-  ) => {
-    const loadingToast = toast.loading("Creating your token...");
-    setIsLoading(true);
+    // Initialize mint
+    const initMintTx = new web3.Transaction().add(
+      token.createInitializeMintInstruction(
+        mintKeypair.publicKey,
+        parseInt(formData.decimals),
+        userPublicKey,
+        userPublicKey,
+        token.TOKEN_PROGRAM_ID
+      )
+    );
+
+    initMintTx.recentBlockhash = (await connection.getLatestBlockhash('confirmed')).blockhash;
+    initMintTx.feePayer = userPublicKey;
+
+    const initSignedTx = await walletProvider.signTransaction(initMintTx);
+    const initSignature = await connection.sendRawTransaction(initSignedTx.serialize());
+    await connection.confirmTransaction(initSignature, 'confirmed');
+
+    // Create token account
+    const associatedTokenAddress = await token.getAssociatedTokenAddress(
+      mintKeypair.publicKey,
+      userPublicKey
+    );
+
+    const createAtaTx = new web3.Transaction().add(
+      token.createAssociatedTokenAccountInstruction(
+        userPublicKey,
+        associatedTokenAddress,
+        userPublicKey,
+        mintKeypair.publicKey
+      )
+    );
+
+    createAtaTx.recentBlockhash = (await connection.getLatestBlockhash('confirmed')).blockhash;
+    createAtaTx.feePayer = userPublicKey;
+
+    const ataSignedTx = await walletProvider.signTransaction(createAtaTx);
+    const ataSignature = await connection.sendRawTransaction(ataSignedTx.serialize());
+    await connection.confirmTransaction(ataSignature, 'confirmed');
+
+    // Mint tokens
+    const mintTx = new web3.Transaction().add(
+      token.createMintToInstruction(
+        mintKeypair.publicKey,
+        associatedTokenAddress,
+        userPublicKey,
+        BigInt(parseFloat(formData.supply) * Math.pow(10, parseInt(formData.decimals)))
+      )
+    );
+
+    mintTx.recentBlockhash = (await connection.getLatestBlockhash('confirmed')).blockhash;
+    mintTx.feePayer = userPublicKey;
+
+    const mintSignedTx = await walletProvider.signTransaction(mintTx);
+    const mintSignature = await connection.sendRawTransaction(mintSignedTx.serialize());
+    await connection.confirmTransaction(mintSignature, 'confirmed');
+
+    setMintAddress(mintKeypair.publicKey.toString());
+    toast.success("Token created successfully!", {
+      id: loadingToast,
+      description: `Mint address: ${mintKeypair.publicKey.toString()}`
+    });
+
+    return mintKeypair.publicKey;
+
+  } catch (error: any) {
+    console.error('Detailed error:', error);
+    toast.error("Transaction failed", {
+      id: loadingToast,
+      description: error.message || "Please try again"
+    });
+    return null;
+  } finally {
+    setIsLoading(false);
+  }
+};
+
+export const createEthereumToken = async (
+  provider: EthereumProvider,
+  formData: { name: string; symbol: string; decimals: string; supply: string },
+  setMintAddress: (address: string) => void,
+  setIsLoading: (loading: boolean) => void
+) => {
+  const loadingToast = toast.loading("Creating your token...");
+  setIsLoading(true);
 
   try {
     // First check if provider is properly connected
