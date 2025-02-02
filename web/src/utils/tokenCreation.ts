@@ -4,6 +4,7 @@ import type { Provider } from '@reown/appkit-adapter-solana';
 import { ethers, ContractFactory, Contract } from 'ethers';
 import { toast } from "sonner";
 import { useAppKitAccount, useAppKitProvider } from '@reown/appkit/react'
+import { SendTransactionError } from '@solana/web3.js';
 
 import { ERC20_ABI, ERC20_BYTECODE } from '@/constants/contracts';
 
@@ -50,25 +51,63 @@ export const createSolanaToken = async (
   try {
     const connection = new web3.Connection(web3.clusterApiUrl('devnet'), {
       commitment: 'processed',
-      confirmTransactionInitialTimeout: 60000,
-      wsEndpoint: 'wss://api.devnet.solana.com/'
+      confirmTransactionInitialTimeout: 60000
     });
 
     const userPublicKey = new web3.PublicKey(walletAddress);
-    
-    // Check and log balance
-    const balance = await connection.getBalance(userPublicKey);
-    console.log('Current SOL balance:', balance / web3.LAMPORTS_PER_SOL);
-
     const mintKeypair = web3.Keypair.generate();
-    console.log('Mint keypair created:', mintKeypair.publicKey.toString());
 
-    // Get rent exemption amount
+    // Function to get fresh blockhash and build transaction
+    const buildTransaction = async (instruction: web3.TransactionInstruction) => {
+      const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash('finalized');
+      const tx = new web3.Transaction().add(instruction);
+      tx.recentBlockhash = blockhash;
+      tx.feePayer = userPublicKey;
+      return { tx, blockhash, lastValidBlockHeight };
+    };
+
+    // Function to send and confirm transaction
+    const sendAndConfirmTx = async (transaction: web3.Transaction, signers: web3.Signer[] = []) => {
+      try {
+        // Sign with additional signers if any
+        if (signers.length > 0) {
+          transaction.sign(...signers);
+        }
+
+        // Sign with wallet
+        const signedTx = await walletProvider.signTransaction(transaction);
+        
+        // Send transaction
+        const signature = await connection.sendRawTransaction(signedTx.serialize(), {
+          skipPreflight: false,
+          preflightCommitment: 'processed'
+        });
+
+        // Confirm transaction
+        const confirmation = await connection.confirmTransaction({
+          signature,
+          blockhash: transaction.recentBlockhash!,
+          lastValidBlockHeight: (await connection.getLatestBlockhash()).lastValidBlockHeight
+        }, 'confirmed');
+
+        if (confirmation.value.err) {
+          throw new Error(`Transaction failed: ${confirmation.value.err}`);
+        }
+
+        return signature;
+      } catch (error) {
+        if (error instanceof SendTransactionError) {
+          console.error('Transaction error logs:', error.logs);
+          throw new Error(`Transaction failed: ${error.message}`);
+        }
+        throw error;
+      }
+    };
+
+    // 1. Create mint account
+    console.log('Creating mint account...');
     const lamports = await token.getMinimumBalanceForRentExemptMint(connection);
-    console.log('Required lamports:', lamports);
-
-    // Create account transaction
-    const createAcctTransaction = new web3.Transaction().add(
+    const { tx: createAcctTx } = await buildTransaction(
       web3.SystemProgram.createAccount({
         fromPubkey: userPublicKey,
         newAccountPubkey: mintKeypair.publicKey,
@@ -77,32 +116,11 @@ export const createSolanaToken = async (
         programId: token.TOKEN_PROGRAM_ID,
       })
     );
+    await sendAndConfirmTx(createAcctTx, [mintKeypair]);
 
-    // Get fresh blockhash
-    const { blockhash } = await connection.getLatestBlockhash('finalized');
-    createAcctTransaction.recentBlockhash = blockhash;
-    createAcctTransaction.feePayer = userPublicKey;
-    createAcctTransaction.sign(mintKeypair);
-
-    console.log('Transaction created and signed by mint keypair');
-
-    // Sign with wallet
-    const signedTx = await walletProvider.signTransaction(createAcctTransaction);
-    console.log('Transaction signed by wallet');
-
-    // Send and confirm
-    const signature = await connection.sendRawTransaction(signedTx.serialize());
-    console.log('Transaction sent:', signature);
-
-    const confirmation = await connection.confirmTransaction(signature, 'confirmed');
-    console.log('Transaction confirmed:', confirmation);
-
-    if (confirmation.value.err) {
-      throw new Error(`Transaction failed: ${confirmation.value.err.toString()}`);
-    }
-
-    // Initialize mint
-    const initMintTx = new web3.Transaction().add(
+    // 2. Initialize mint
+    console.log('Initializing mint...');
+    const { tx: initMintTx } = await buildTransaction(
       token.createInitializeMintInstruction(
         mintKeypair.publicKey,
         parseInt(formData.decimals),
@@ -111,21 +129,15 @@ export const createSolanaToken = async (
         token.TOKEN_PROGRAM_ID
       )
     );
+    await sendAndConfirmTx(initMintTx);
 
-    initMintTx.recentBlockhash = (await connection.getLatestBlockhash('confirmed')).blockhash;
-    initMintTx.feePayer = userPublicKey;
-
-    const initSignedTx = await walletProvider.signTransaction(initMintTx);
-    const initSignature = await connection.sendRawTransaction(initSignedTx.serialize());
-    await connection.confirmTransaction(initSignature, 'confirmed');
-
-    // Create token account
+    // 3. Create Associated Token Account
+    console.log('Creating token account...');
     const associatedTokenAddress = await token.getAssociatedTokenAddress(
       mintKeypair.publicKey,
       userPublicKey
     );
-
-    const createAtaTx = new web3.Transaction().add(
+    const { tx: createAtaTx } = await buildTransaction(
       token.createAssociatedTokenAccountInstruction(
         userPublicKey,
         associatedTokenAddress,
@@ -133,16 +145,11 @@ export const createSolanaToken = async (
         mintKeypair.publicKey
       )
     );
+    await sendAndConfirmTx(createAtaTx);
 
-    createAtaTx.recentBlockhash = (await connection.getLatestBlockhash('confirmed')).blockhash;
-    createAtaTx.feePayer = userPublicKey;
-
-    const ataSignedTx = await walletProvider.signTransaction(createAtaTx);
-    const ataSignature = await connection.sendRawTransaction(ataSignedTx.serialize());
-    await connection.confirmTransaction(ataSignature, 'confirmed');
-
-    // Mint tokens
-    const mintTx = new web3.Transaction().add(
+    // 4. Mint tokens
+    console.log('Minting tokens...');
+    const { tx: mintTx } = await buildTransaction(
       token.createMintToInstruction(
         mintKeypair.publicKey,
         associatedTokenAddress,
@@ -150,13 +157,7 @@ export const createSolanaToken = async (
         BigInt(parseFloat(formData.supply) * Math.pow(10, parseInt(formData.decimals)))
       )
     );
-
-    mintTx.recentBlockhash = (await connection.getLatestBlockhash('confirmed')).blockhash;
-    mintTx.feePayer = userPublicKey;
-
-    const mintSignedTx = await walletProvider.signTransaction(mintTx);
-    const mintSignature = await connection.sendRawTransaction(mintSignedTx.serialize());
-    await connection.confirmTransaction(mintSignature, 'confirmed');
+    await sendAndConfirmTx(mintTx);
 
     setMintAddress(mintKeypair.publicKey.toString());
     toast.success("Token created successfully!", {
@@ -247,7 +248,7 @@ export const createEthereumToken = async (
 
     const contract = await Promise.race([deploymentPromise, timeoutPromise]) as Contract;
     const deployedContract = await contract.waitForDeployment();
-    const contractAddress = await deployedContract.getAddress();
+    const contractAddress = await deployedContract.getAddress();  
     
     setMintAddress(contractAddress);
     
