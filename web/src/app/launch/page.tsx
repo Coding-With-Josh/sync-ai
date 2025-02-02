@@ -56,7 +56,7 @@ const projectId = "14f3352e17f7610fa94ef9c1b8206ba6";
 
 // 4. Create the AppKit instance
 const modal = createAppKit({
-  adapters: [
+  adapters: [ 
     new EthersAdapter(),
     new SolanaAdapter(),
     // new BitcoinAdapter({
