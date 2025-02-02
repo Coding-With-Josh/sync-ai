@@ -10,7 +10,9 @@ import { toast } from "sonner";
 import { useAppKitAccount, useAppKitProvider } from '@reown/appkit/react'
 import { z } from "zod";
 
+// import { createSolanaToken, createEthereumToken, requestSolanaAirdrop, createBitcoinToken } from '@/utils/tokenCreation';
 import { createSolanaToken, createEthereumToken, requestSolanaAirdrop } from '@/utils/tokenCreation';
+
 
 const tokenSchema = z.object({
   name: z.string().min(1, "Token name is required"),
@@ -62,9 +64,10 @@ export function TokenForm({ selectedChain, formData, setFormData, walletAddress 
   const [mintAddress, setMintAddress] = useState<string>('');
 
   
-  // Get providers for both chains
+  // Get providers for all chains
   const { walletProvider: solanaProvider } = useAppKitProvider<SolanaProvider>('solana');
   const { walletProvider: ethereumProvider } = useAppKitProvider<EthereumProvider>('eip155');
+  // const { walletProvider: bitcoinProvider } = useAppKitProvider('bitcoin' as ChainNamespace);
 
   const createToken = async () => {
     if (!selectedChain) {
@@ -115,6 +118,26 @@ export function TokenForm({ selectedChain, formData, setFormData, walletAddress 
           }
           break;
         } 
+
+        // case 'bitcoin': {
+        //   if (!bitcoinProvider?.request) {
+        //     toast.error("Please connect a Bitcoin wallet");
+        //     return;
+        //   }
+
+        //   try {
+        //     address = await createBitcoinToken(
+        //       bitcoinProvider,
+        //       formData,
+        //       setMintAddress,
+        //       setIsLoading
+        //     );
+        //   } catch (error) {
+        //     toast.error("Bitcoin network error");
+        //     return;
+        //   }
+        //   break;
+        // }
           
         default:
           toast.error("Selected chain not supported yet");

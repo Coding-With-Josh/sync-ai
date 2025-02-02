@@ -5,6 +5,7 @@ import { ethers, ContractFactory, Contract } from 'ethers';
 import { toast } from "sonner";
 import { useAppKitAccount, useAppKitProvider } from '@reown/appkit/react'
 import { SendTransactionError } from '@solana/web3.js';
+// import * as bitcoin from 'bitcoinjs-lib';
 
 import { ERC20_ABI, ERC20_BYTECODE } from '@/constants/contracts';
 
@@ -15,7 +16,14 @@ interface EthereumProvider {
   on?: (eventName: string, handler: (...args: any[]) => void) => void;
   removeListener?: (eventName: string, handler: (...args: any[]) => void) => void;
 }
- 
+
+// Add Bitcoin provider type
+interface BitcoinProvider {
+  request: (args: { method: string; params?: any[] }) => Promise<any>;
+  isTauri?: boolean;
+  on?: (eventName: string, handler: (...args: any[]) => void) => void;
+}
+
 const getLatestBlockhash = async (connection: web3.Connection) => {
     const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash('finalized');
     return { blockhash, lastValidBlockHeight };
@@ -98,7 +106,7 @@ export const createSolanaToken = async (
       } catch (error) {
         if (error instanceof SendTransactionError) {
           console.error('Transaction error logs:', error.logs);
-          throw new Error(`Transaction failed: ${error.message}`);
+          throw new Error(`Transaction failed: ${error.getLogs}`);
         }
         throw error;
       }
@@ -278,3 +286,68 @@ export const createEthereumToken = async (
     setIsLoading(false);
   }
 };
+
+// export const createBitcoinToken = async (
+//   provider: BitcoinProvider,
+//   formData: { name: string; symbol: string; decimals: string; supply: string },
+//   setMintAddress: (address: string) => void,
+//   setIsLoading: (loading: boolean) => void
+// ) => {
+//   const loadingToast = toast.loading("Creating RGB token on Bitcoin...");
+//   setIsLoading(true);
+
+//   try {
+//     // Check provider connection
+//     if (!provider?.request) {
+//       throw new Error("Bitcoin wallet not properly connected");
+//     }
+
+//     // Get Bitcoin network (testnet for development)
+//     const network = bitcoin.networks.testnet;
+
+//     // Request account access
+//     const accounts = await provider.request({ 
+//       method: 'request_accounts' 
+//     });
+
+//     if (!accounts || accounts.length === 0) {
+//       throw new Error("No Bitcoin account found");
+//     }
+
+//     // Create RGB schema for the token
+//     const rgbSchema = {
+//       name: formData.name,
+//       symbol: formData.symbol,
+//       precision: parseInt(formData.decimals),
+//       supply: BigInt(parseFloat(formData.supply) * Math.pow(10, parseInt(formData.decimals))),
+//     };
+
+//     // Deploy RGB contract
+//     const contractId = await provider.request({
+//       method: 'rgb_deploy',
+//       params: [rgbSchema]
+//     });
+
+//     if (!contractId) {
+//       throw new Error("Failed to deploy RGB contract");
+//     }
+
+//     setMintAddress(contractId);
+//     toast.success("Token created successfully!", {
+//       id: loadingToast,
+//       description: `RGB Contract ID: ${contractId}`
+//     });
+
+//     return contractId;
+
+//   } catch (error: any) {
+//     console.error('Error creating Bitcoin token:', error);
+//     toast.error("Failed to create token", {
+//       id: loadingToast,
+//       description: error.message || "Bitcoin token creation failed"
+//     });
+//     return null;
+//   } finally {
+//     setIsLoading(false);
+//   }
+// };

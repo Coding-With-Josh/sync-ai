@@ -4,6 +4,7 @@ import { useState, useMemo } from "react";
 
 import { EthersAdapter } from "@reown/appkit-adapter-ethers";
 import { SolanaAdapter } from "@reown/appkit-adapter-solana";
+// import { BitcoinAdapter } from '@reown/appkit-adapter-bitcoin';
 import {
   SolflareWalletAdapter,
   PhantomWalletAdapter,
@@ -58,9 +59,10 @@ const modal = createAppKit({
   adapters: [
     new EthersAdapter(),
     new SolanaAdapter(),
-    //   {
-    //   wallets: [new PhantomWalletAdapter(), new SolflareWalletAdapter()]
-    // }
+    // new BitcoinAdapter({
+    //   network: 'testnet',
+    //   defaultProvider: 'rgb'
+    // })
   ],
   networks: [mainnet, arbitrum, sepolia, solana, solanaTestnet, solanaDevnet],
   projectId,
