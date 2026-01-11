@@ -29,11 +29,17 @@ This project demonstrates:
 
 ---
 
+## Live Website
+
+[https://sync-launch-pad.vercel.app](https://sync-launch-pad.vercel.app)
+
+---
+
 ## Project Status
 
-* Under active development
-* Not deployed publicly yet
-* Features and UI are subject to change
+* Live and publicly accessible
+* Actively maintained and iterated on
+* Features and UI may evolve over time
 
 ---
 
